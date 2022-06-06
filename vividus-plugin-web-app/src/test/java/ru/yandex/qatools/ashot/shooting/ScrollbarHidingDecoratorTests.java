@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 the original author or authors.
+ * Copyright 2019-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.vividus.selenium.screenshot;
+package ru.yandex.qatools.ashot.shooting;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -32,56 +32,39 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-
-import ru.yandex.qatools.ashot.coordinates.Coords;
-import ru.yandex.qatools.ashot.coordinates.CoordsProvider;
-import ru.yandex.qatools.ashot.shooting.ShootingStrategy;
+import org.vividus.selenium.screenshot.ScrollbarHandler;
 
 @ExtendWith(MockitoExtension.class)
-class ScrollbarHidingAshotTests
+class ScrollbarHidingDecoratorTests
 {
     @Mock private ShootingStrategy strategy;
     @Mock private ScrollbarHandler scrollbarHandler;
     @Mock private WebDriver webDriver;
     @Mock private BufferedImage bufferedImage;
-    @Mock private ru.yandex.qatools.ashot.Screenshot screenshot;
 
     @Test
     void shouldTakeScreenshotsWithHiddenScrollbars()
     {
-        ScrollbarHidingAshot ashot = new ScrollbarHidingAshot(Optional.empty(), scrollbarHandler);
-        ashot.shootingStrategy(strategy);
+        ScrollbarHidingDecorator decorator = new ScrollbarHidingDecorator(strategy, Optional.empty(), scrollbarHandler);
         when(scrollbarHandler.performActionWithHiddenScrollbars(argThat(s -> {
             s.get();
             return true;
-        }))).thenReturn(screenshot);
+        }))).thenReturn(bufferedImage);
         when(strategy.getScreenshot(webDriver)).thenReturn(bufferedImage);
-        ashot.takeScreenshot(webDriver);
-        assertSame(screenshot, ashot.takeScreenshot(webDriver));
+        assertSame(bufferedImage, decorator.getScreenshot(webDriver));
     }
 
     @Test
     void shouldTakeScreenshotsWithElementAndWithHiddenScrollbars()
     {
         WebElement scrollableElement = mock(WebElement.class);
-        ScrollbarHidingAshot ashot = new ScrollbarHidingAshot(Optional.of(scrollableElement), scrollbarHandler);
-        ashot.shootingStrategy(strategy);
-        ashot.coordsProvider(new CoordsProvider()
-        {
-            private static final long serialVersionUID = 8784997908203644003L;
-
-            @Override
-            public Coords ofElement(WebDriver driver, WebElement element)
-            {
-                return new Coords(0, 0, 0, 0);
-            }
-        });
+        ScrollbarHidingDecorator decorator = new ScrollbarHidingDecorator(strategy, Optional.of(scrollableElement),
+                scrollbarHandler);
         when(scrollbarHandler.performActionWithHiddenScrollbars(argThat(s -> {
             s.get();
             return true;
-        }), eq(scrollableElement))).thenReturn(screenshot);
+        }), eq(scrollableElement))).thenReturn(bufferedImage);
         when(strategy.getScreenshot(webDriver, Set.of())).thenReturn(bufferedImage);
-        ashot.takeScreenshot(webDriver, scrollableElement);
-        assertSame(screenshot, ashot.takeScreenshot(webDriver, scrollableElement));
+        assertSame(bufferedImage, decorator.getScreenshot(webDriver, Set.of()));
     }
 }

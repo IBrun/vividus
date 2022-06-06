@@ -18,6 +18,8 @@ package org.vividus.selenium.screenshot;
 
 import java.util.Optional;
 
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 import org.vividus.selenium.screenshot.strategies.AdjustingScrollableElementAwareViewportPastingDecorator;
 import org.vividus.selenium.screenshot.strategies.AdjustingViewportPastingDecorator;
 import org.vividus.selenium.screenshot.strategies.ScreenshotShootingStrategy;
@@ -28,7 +30,10 @@ import org.vividus.ui.web.screenshot.WebCutOptions;
 import org.vividus.ui.web.screenshot.WebScreenshotParameters;
 
 import ru.yandex.qatools.ashot.AShot;
+import ru.yandex.qatools.ashot.coordinates.Coords;
+import ru.yandex.qatools.ashot.coordinates.CoordsProvider;
 import ru.yandex.qatools.ashot.shooting.DebuggingViewportPastingDecorator;
+import ru.yandex.qatools.ashot.shooting.ScrollbarHidingDecorator;
 import ru.yandex.qatools.ashot.shooting.ShootingStrategy;
 
 public class WebAshotFactory extends AbstractAshotFactory<WebScreenshotParameters>
@@ -69,9 +74,18 @@ public class WebAshotFactory extends AbstractAshotFactory<WebScreenshotParameter
                 screenshotParameters))
                 .withDebugger(screenshotDebugger);
 
-        return new ScrollbarHidingAshot(screenshotParameters.getScrollableElement(), scrollbarHandler)
+        decorated = decorateWithScrollbarHiding(decorated, screenshotParameters.getScrollableElement());
+
+        decorated = decorateWithCropping(decorated, screenshotParameters.getIgnoreStrategies(),
+                screenshotParameters.getNativeHeaderToCut());
+
+        CoordsProvider coordsProvider = screenshotParameters.getCoordsProvider().create(javascriptActions);
+        CoordsProvider scrollBarHidingCoordsProvider = new ScrollBarHidingCoordsProviderDecorator(coordsProvider,
+                scrollbarHandler);
+
+        return new AShot()
                 .shootingStrategy(decorated)
-                .coordsProvider(screenshotParameters.getCoordsProvider().create(javascriptActions));
+                .coordsProvider(scrollBarHidingCoordsProvider);
     }
 
     private ShootingStrategy decorateWithViewportPasting(ShootingStrategy toDecorate,
@@ -87,20 +101,48 @@ public class WebAshotFactory extends AbstractAshotFactory<WebScreenshotParameter
                        .withScrollTimeout(((Long) screenshotParameters.getScrollTimeout().toMillis()).intValue());
     }
 
+    private ShootingStrategy decorateWithScrollbarHiding(ShootingStrategy strategy,
+            Optional<WebElement> scrollableElement)
+    {
+        return new ScrollbarHidingDecorator(strategy, scrollableElement, scrollbarHandler);
+    }
+
     private AShot createAShot(String screenshotShootingStrategyName)
     {
         ScreenshotShootingStrategy configured = getStrategyBy(screenshotShootingStrategyName);
         ShootingStrategy baseShootingStrategy = getBaseShootingStrategy();
         ShootingStrategy shootingStrategy = configured.getDecoratedShootingStrategy(baseShootingStrategy);
-        return new ScrollbarHidingAshot(Optional.empty(), scrollbarHandler).shootingStrategy(shootingStrategy)
-                .coordsProvider(configured instanceof SimpleScreenshotShootingStrategy
-                        ? CeilingJsCoordsProvider.getSimple(javascriptActions)
-                        : CeilingJsCoordsProvider.getScrollAdjusted(javascriptActions));
+        shootingStrategy = decorateWithScrollbarHiding(shootingStrategy, Optional.empty());
+        CoordsProvider coordsProvider = configured instanceof SimpleScreenshotShootingStrategy
+                ? CeilingJsCoordsProvider.getSimple(javascriptActions)
+                : CeilingJsCoordsProvider.getScrollAdjusted(javascriptActions);
+        return new AShot().shootingStrategy(shootingStrategy)
+                .coordsProvider(new ScrollBarHidingCoordsProviderDecorator(coordsProvider, scrollbarHandler));
     }
 
     @Override
     protected double getDpr()
     {
         return javascriptActions.getDevicePixelRatio();
+    }
+
+    static final class ScrollBarHidingCoordsProviderDecorator extends CoordsProvider
+    {
+        private static final long serialVersionUID = -4309766535331129861L;
+
+        private final CoordsProvider coordsProvider;
+        private final transient IScrollbarHandler scrollbarHandler;
+
+        ScrollBarHidingCoordsProviderDecorator(CoordsProvider coordsProvider, IScrollbarHandler scrollbarHandler)
+        {
+            this.coordsProvider = coordsProvider;
+            this.scrollbarHandler = scrollbarHandler;
+        }
+
+        @Override
+        public Coords ofElement(WebDriver driver, WebElement element)
+        {
+            return scrollbarHandler.performActionWithHiddenScrollbars(() -> coordsProvider.ofElement(driver, element));
+        }
     }
 }
