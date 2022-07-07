@@ -46,6 +46,8 @@ import org.vividus.visual.model.AbstractVisualCheck;
 import org.vividus.visual.model.VisualActionType;
 import org.vividus.visual.model.VisualCheckResult;
 
+import ru.yandex.qatools.ashot.Screenshot;
+
 @ExtendWith(MockitoExtension.class)
 class VisualStepsTests
 {
@@ -58,13 +60,26 @@ class VisualStepsTests
 
     @SuppressWarnings("unchecked")
     @Test
-    void shouldRecordAssertionWhenContextIsNull()
+    void shouldNotRunVisualCheckWhenContextAndScreenshotAreNull()
     {
         Function<AbstractVisualCheck, VisualCheckResult> checkResultProvider = mock(Function.class);
-        Supplier<AbstractVisualCheck> visualCheckFactory = mock(Supplier.class);
+        AbstractVisualCheck visualCheck = mock(AbstractVisualCheck.class);
+        when(visualCheck.getScreenshot()).thenReturn(null);
+        Supplier<AbstractVisualCheck> visualCheckFactory = () -> visualCheck;
         when(uiContext.getOptionalSearchContext()).thenReturn(Optional.empty());
         visualSteps.execute(checkResultProvider, visualCheckFactory, TEMPLATE);
-        verifyNoInteractions(visualCheckFactory, checkResultProvider, attachmentPublisher);
+        verifyNoInteractions(checkResultProvider, attachmentPublisher);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"true, COMPARE_AGAINST", "false, CHECK_INEQUALITY_AGAINST"})
+    void shouldPublishAttachmentWhenScreenshotIsNotNull(boolean passed, VisualActionType action)
+    {
+        AbstractVisualCheck visualCheck = mock(AbstractVisualCheck.class);
+        Screenshot screenshot = mock(Screenshot.class);
+        when(visualCheck.getScreenshot()).thenReturn(screenshot);
+        shouldPublishAttachment(passed, action, visualCheck);
+        verifyNoInteractions(uiContext);
     }
 
     @Test
@@ -86,17 +101,9 @@ class VisualStepsTests
     {
         SearchContext searchContext = mock(SearchContext.class);
         AbstractVisualCheck visualCheck = mock(AbstractVisualCheck.class);
-        VisualCheckResult visualCheckResult = mock(VisualCheckResult.class);
-        when(visualCheckResult.getActionType()).thenReturn(action);
         when(uiContext.getOptionalSearchContext()).thenReturn(Optional.of(searchContext));
-        Function<AbstractVisualCheck, VisualCheckResult> checkResultProvider = check -> visualCheckResult;
-        Supplier<AbstractVisualCheck> visualCheckFactory = () -> visualCheck;
-        when(visualCheckResult.isPassed()).thenReturn(passed);
-        visualSteps.execute(checkResultProvider, visualCheckFactory, TEMPLATE);
-        InOrder ordered = Mockito.inOrder(attachmentPublisher, visualCheckResult, softAssert);
-        ordered.verify(attachmentPublisher).publishAttachment(TEMPLATE, Map.of("result", visualCheckResult),
-                "Visual comparison");
-        ordered.verify(softAssert).assertTrue("Visual check passed", true);
+        when(visualCheck.getSearchContext()).thenReturn(searchContext);
+        shouldPublishAttachment(passed, action, visualCheck);
         verify(visualCheck).setSearchContext(searchContext);
     }
 
@@ -110,17 +117,29 @@ class VisualStepsTests
     @Test
     void shouldRecordInvalidVisualCheckPreconditionException()
     {
-        SearchContext searchContext = mock(SearchContext.class);
         ScreenshotPrecondtionMismatchException exception = mock(ScreenshotPrecondtionMismatchException.class);
         Supplier<AbstractVisualCheck> visualCheckFactory = mock(Supplier.class);
         doThrow(exception).when(visualCheckFactory).get();
         Function<AbstractVisualCheck, VisualCheckResult> checkResultProvider = mock(Function.class);
-        when(uiContext.getOptionalSearchContext()).thenReturn(Optional.of(searchContext));
 
         visualSteps.execute(checkResultProvider, visualCheckFactory, TEMPLATE);
 
         verify(softAssert).recordFailedAssertion(exception);
-        verifyNoInteractions(attachmentPublisher, checkResultProvider);
+        verifyNoInteractions(uiContext, attachmentPublisher, checkResultProvider);
+    }
+
+    private void shouldPublishAttachment(boolean passed, VisualActionType action, AbstractVisualCheck visualCheck)
+    {
+        VisualCheckResult visualCheckResult = mock(VisualCheckResult.class);
+        when(visualCheckResult.getActionType()).thenReturn(action);
+        when(visualCheckResult.isPassed()).thenReturn(passed);
+        Function<AbstractVisualCheck, VisualCheckResult> checkResultProvider = check -> visualCheckResult;
+        Supplier<AbstractVisualCheck> visualCheckFactory = () -> visualCheck;
+        visualSteps.execute(checkResultProvider, visualCheckFactory, TEMPLATE);
+        InOrder ordered = Mockito.inOrder(attachmentPublisher, visualCheckResult, softAssert);
+        ordered.verify(attachmentPublisher).publishAttachment(TEMPLATE, Map.of("result", visualCheckResult),
+                "Visual comparison");
+        ordered.verify(softAssert).assertTrue("Visual check passed", true);
     }
 
     private static final class TestVisualSteps extends AbstractVisualSteps

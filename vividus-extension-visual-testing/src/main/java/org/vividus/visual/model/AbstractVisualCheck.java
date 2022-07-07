@@ -25,10 +25,13 @@ import org.vividus.ui.action.search.Locator;
 import org.vividus.ui.screenshot.ScreenshotParameters;
 import org.vividus.visual.screenshot.IgnoreStrategy;
 
+import ru.yandex.qatools.ashot.Screenshot;
+
 public abstract class AbstractVisualCheck
 {
     private String baselineName;
     private VisualActionType action;
+    private Screenshot screenshot;
     private Map<IgnoreStrategy, Set<Locator>> elementsToIgnore = Map.of();
     private Optional<ScreenshotParameters> screenshotParameters = Optional.empty();
     private SearchContext searchContext;
@@ -82,5 +85,15 @@ public abstract class AbstractVisualCheck
     public void setSearchContext(SearchContext searchContext)
     {
         this.searchContext = searchContext;
+    }
+
+    public Screenshot getScreenshot()
+    {
+        return screenshot;
+    }
+
+    public void setScreenshot(Screenshot screenshot)
+    {
+        this.screenshot = screenshot;
     }
 }

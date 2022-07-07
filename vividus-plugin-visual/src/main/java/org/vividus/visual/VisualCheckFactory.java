@@ -23,6 +23,7 @@ import org.vividus.ui.screenshot.ScreenshotConfiguration;
 import org.vividus.ui.screenshot.ScreenshotParametersFactory;
 import org.vividus.visual.model.VisualActionType;
 import org.vividus.visual.model.VisualCheck;
+import ru.yandex.qatools.ashot.Screenshot;
 
 public class VisualCheckFactory extends AbstractVisualCheckFactory<VisualCheck>
 {
@@ -51,6 +52,15 @@ public class VisualCheckFactory extends AbstractVisualCheckFactory<VisualCheck>
         String indexedBaselineName = createIndexedBaseline(baselineName);
         VisualCheck check = new VisualCheck(indexedBaselineName, actionType);
         withScreenshotConfiguration(check, parameters);
+        return check;
+    }
+
+    public VisualCheck create(String baselineName, VisualActionType actionType,
+            Screenshot screenshot)
+    {
+        VisualCheck check = new VisualCheck(baselineName, actionType);
+        check.setScreenshot(screenshot);
+        withScreenshotConfiguration(check, Optional.empty());
         return check;
     }
 }

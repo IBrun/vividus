@@ -71,7 +71,8 @@ public class VisualTestingEngine implements IVisualTestingEngine
 
     private Screenshot getCheckpointScreenshot(VisualCheck visualCheck)
     {
-        return screenshotProvider.take(visualCheck);
+       return visualCheck.getScreenshot() != null ? visualCheck.getScreenshot():
+               screenshotProvider.take(visualCheck);
     }
 
     @Override

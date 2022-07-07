@@ -16,19 +16,7 @@
 
 package org.vividus.visual;
 
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.util.Map;
-import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import com.google.gson.reflect.TypeToken;
-
 import org.jbehave.core.annotations.When;
 import org.jbehave.core.model.ExamplesTable;
 import org.jbehave.core.steps.Parameters;
@@ -44,6 +32,23 @@ import org.vividus.visual.model.VisualCheck;
 import org.vividus.visual.model.VisualCheckResult;
 import org.vividus.visual.screenshot.IgnoreStrategy;
 import org.vividus.visual.steps.AbstractVisualSteps;
+import ru.yandex.qatools.ashot.Screenshot;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class VisualSteps extends AbstractVisualSteps
 {
@@ -73,6 +78,18 @@ public class VisualSteps extends AbstractVisualSteps
     public void runVisualTests(VisualActionType actionType, String name)
     {
         performVisualAction(() -> visualCheckFactory.create(name, actionType));
+    }
+
+    /**
+     * Step establishes baseline or compares against existing one.
+     *
+     * @param actionType ESTABLISH, COMPARE_AGAINST, CHECK_INEQUALITY_AGAINST
+     * @param name       The baseline name
+     */
+    @When("I $actionType baseline with name `$name` from image `$image`")
+    public void runVisualTests(VisualActionType actionType, String name, BufferedImage image)
+    {
+        performVisualAction(() -> visualCheckFactory.create(name, actionType, new Screenshot(image)));
     }
 
     /**
@@ -255,6 +272,20 @@ public class VisualSteps extends AbstractVisualSteps
             setDiffPercentage(visualCheck, rowAsParameters);
             return visualCheck;
         });
+    }
+
+    private Screenshot loadScreenshot(byte[] bytes)
+    {
+        BufferedImage image = null;
+        try
+        {
+            image = ImageIO.read(new ByteArrayInputStream(bytes));
+        }
+        catch (IOException e)
+        {
+            getSoftAssert().recordFailedAssertion(e);
+        }
+        return new Screenshot(image);
     }
 
     private void setDiffPercentage(VisualCheck visualCheck, Parameters rowAsParameters)

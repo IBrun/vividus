@@ -140,6 +140,24 @@ class VisualTestingEngineTests
         assertThat(testLogger.getLoggingEvents(), empty());
     }
 
+    @Test
+    void shouldReturnOnlyCheckpoinForEstablishAction() throws IOException
+    {
+        initObjectUnderTest();
+        VisualCheck visualCheck = factory.create(BASELINE,VisualActionType.ESTABLISH, new Screenshot(loadImage("checkpoint")));
+        VisualCheckResult checkResult = visualTestingEngine.establish(visualCheck);
+        verify(baselineRepository).saveBaseline(argThat(s -> visualCheck.getScreenshot().getImage().equals(s.getImage())),
+                eq(BASELINE));
+        Assertions.assertAll(
+                () -> assertNull(checkResult.getBaseline()),
+                () -> assertNull(checkResult.getDiff()),
+                () -> assertEquals(BASELINE, checkResult.getBaselineName()),
+                () -> assertEquals(VisualActionType.ESTABLISH, checkResult.getActionType()),
+                () -> assertEquals(CHECKPOINT_BASE64, checkResult.getCheckpoint()),
+                () -> assertFalse(checkResult.isPassed()));
+        assertThat(testLogger.getLoggingEvents(), empty());
+    }
+
     private VisualCheck createVisualCheck(VisualActionType actionType)
     {
         return factory.create(BASELINE, actionType);

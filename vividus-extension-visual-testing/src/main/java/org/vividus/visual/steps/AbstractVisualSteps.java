@@ -46,13 +46,15 @@ public abstract class AbstractVisualSteps
             Function<T, VisualCheckResult> checkResultProvider,
             Supplier<T> visualCheckFactory, String templateName)
     {
-        uiContext.getOptionalSearchContext().ifPresent(searchContext ->
+        try
         {
-            try
+            T visualCheck = visualCheckFactory.get();
+            if (visualCheck.getScreenshot() == null)
             {
-                T visualCheck = visualCheckFactory.get();
-                visualCheck.setSearchContext(searchContext);
-
+                uiContext.getOptionalSearchContext().ifPresent(visualCheck::setSearchContext);
+            }
+            if (visualCheck.getScreenshot() != null || visualCheck.getSearchContext() != null)
+            {
                 VisualCheckResult result = checkResultProvider.apply(visualCheck);
 
                 if (null != result)
@@ -61,11 +63,11 @@ public abstract class AbstractVisualSteps
                     verifyResult(result);
                 }
             }
-            catch (ScreenshotPrecondtionMismatchException e)
-            {
-                softAssert.recordFailedAssertion(e);
-            }
-        });
+        }
+        catch (ScreenshotPrecondtionMismatchException e)
+        {
+            softAssert.recordFailedAssertion(e);
+        }
     }
 
     protected void verifyResult(VisualCheckResult result)
